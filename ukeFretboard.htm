@@ -1,0 +1,205 @@
+<html>
+<head>
+<title>Ukelele Helper</title>
+<style type="text/css">
+
+table{
+	border-collapse: collapse;
+	margin: 0px;
+}
+
+tr{
+	height: 20px;
+}
+
+td{
+	border-right: solid black 1px;
+	padding: 0px;
+	margin: 0px;
+	text-align: center;
+	font-size: 10px;
+	font-family: "Helvetica";
+}
+
+hr{
+	border: 0;
+	height: 2px;
+	background-color: black;
+}
+</style>
+<script language="javascript">
+function $(id){
+	return document.getElementById(id);
+}
+
+function ukeleleFretboard(boardId, length, controlsId){
+	var container = $(boardId);
+	var controls = $(controlsId)
+	var boardLength = length;
+	container.style.width = length;
+
+	var k = 1.0594631; // constant for guitar math
+	var fretLengths = [20];
+	
+	var notes = ["E", "F", "F#/Gb", "G", "G#/Ab", "A", "A#/Bb", "B", "C", "C#/Db", "D", "D#/Eb"];
+	var stringRoots = [3, 8, 0, 5];
+	var numFrets = 15;
+	
+	var table = createTable();
+	container.appendChild(table);
+	
+	var highlightColor = "#bbb";
+	
+	var selectionModes = new Array();
+	selectionModes['Single'] = [0];
+	selectionModes['Major Triad'] = [0, 4, 7]; //major third, perfect fifth
+	selectionModes['Minor Triad'] = [0, 3, 7]; //minor third, perfect fifth
+	selectionModes['Augmented Triad'] = [0, 4, 8]; //major third, augmented fifth
+	selectionModes['Diminished Triad'] = [0, 3, 6]; //minor third, diminished fifth
+
+	var selectionMode = 'Single';
+	
+	setupControls();
+	
+	//highlightFret(1, 1);
+	
+	function setSelectionMode(e){
+		selectionMode = e.target.value;
+	}
+	
+	function selectionControls(){
+		var selectionOptionsContainer = document.createElement("DIV");
+		var options = document.createElement("FORM");
+		for(mode in selectionModes){
+			var option = document.createElement("INPUT");
+			option.type = "radio";
+			option.name = "selectionMode";
+			option.value = mode;
+			option.onclick = setSelectionMode;
+			
+			if(option.value == "Single"){
+				option.checked = true;
+			}
+			selectionOptionsContainer.appendChild(option);
+			selectionOptionsContainer.appendChild(document.createTextNode(mode));
+			selectionOptionsContainer.appendChild(document.createElement("BR"));
+		}
+		return selectionOptionsContainer;
+	}
+	
+	function setupControls(){
+		controls.appendChild(selectionControls());
+	}
+	
+	function getFret(string, fret){
+		return table.rows[string].cells[fret];
+	}
+	
+	function highlightFret(string, fret){
+		getFret(string, fret).style.backgroundColor=highlightColor;
+	}
+	
+	function fretDistFromBridge(fretNumber){
+		return boardLength/Math.pow(k, fretNumber);
+	}
+	
+	function fretLength(fretNumber){
+		if(!fretLengths[fretNumber]){
+			fretLengths[fretNumber] = fretDistFromBridge(fretNumber) - fretDistFromBridge(fretNumber+1); 
+		}
+		return fretLengths[fretNumber];
+	}
+
+	function clearHighlight(){
+		var frets = table.getElementsByTagName("td");
+		for(var i=frets.length-1; i>-1; i--){
+			frets[i].style.backgroundColor = "#fff";
+			frets[i].selected = false;
+		}
+	}
+	
+	function arrayContainsAtIndex(array, target){
+		for(i=array.length; i>-1; i--){
+			if(array[i] == target){
+				return i;
+			}
+		}
+		return -1;
+	}
+	
+	function sharpenNote(note, times){
+		var i = arrayContainsAtIndex(notes, note);
+		return notes[(i+times) % notes.length];
+	}
+	
+	function highlightNotes(notes, colors){
+		var frets = table.getElementsByTagName("td");
+		for(var i=frets.length-1; i>-1; i--){
+			var fret = frets[i];
+			var noteIndex = arrayContainsAtIndex(notes, fret.note);
+			if(noteIndex != -1){
+				var color = colors[noteIndex];
+				fret.style.backgroundColor = color;
+				fret.selected = true;
+			}
+		}
+	}
+	
+	function selectNotes(e){
+		//alert(e.target.note);
+		if(!e.altKey){
+			clearHighlight();
+		}
+		var targetOffsets = selectionModes[selectionMode];
+		var colors = new Array();
+		var targets = new Array();
+		var root = e.target.note;
+		var colorInterval = 1.0/targetOffsets.length;
+		for(var i=0; i<targetOffsets.length; i++){
+			var color = Math.floor(119 + colorInterval * i * 100);
+			var note = sharpenNote(root, targetOffsets[i]);
+			targets.push(note);
+			colors.push("rgb(" + color + ", " + color + ", " + color + ")");
+		}
+		//alert(colors);
+		highlightNotes(targets, colors);
+	}
+	
+	function createTable(){
+		var table = document.createElement("TABLE");
+		var tableHeader = "<tr>";
+		for(var i=0; i<=numFrets; i++){
+			tableHeader += "<th>" + i + "</th>";
+		}
+		tableHeader += "</tr>";
+		table.innerHTML += tableHeader;
+		for(var string=stringRoots.length; string>=1; string--){
+			var row = document.createElement("TR");
+			row.id="string" + string;
+			for(var fret=0; fret<=numFrets; fret++){
+				var fretData = document.createElement("TD");
+				fretData.style.width = fretLength(fret);
+				fretData.innerHTML = fretData.note = notes[(stringRoots[string-1] + fret)%12];
+				fretData.onclick = selectNotes;
+				fretData.selected = false;
+				row.appendChild(fretData);
+			}
+			table.appendChild(row);
+		}
+		return table;
+	}
+}
+
+function setupFretboard(){
+	var fretboard = new ukeleleFretboard("fretboard", 1800, "controls");
+}
+</script>
+</head>
+<body onload="setupFretboard();">
+<div id="fretboard">
+</div>
+<div id="controls">
+</div>
+</body>
+
+</html>

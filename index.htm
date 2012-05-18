@@ -1,0 +1,37 @@
+<html>
+<head>
+	<title>Fretboard Helper</title>
+	<link rel="stylesheet" href="default.css" />
+	<link rel="stylesheet" href="debug.css" />
+
+	<script src="Scripts/Lib/jquery-1.6.1.min.js"></script>
+	<script src="Scripts/Lib/ember-0.9.6.js"></script>
+	<script src="Scripts/DFretboard.js"></script>
+</head>
+<body>
+	<script type="text/x-handlebars">
+		<table>
+			<tr>
+				{{#each DFretboard.Fretboard.fretIndices}}
+					<th>{{this}}</th>
+				{{/each}}
+			</tr>
+			{{#each DFretboard.Fretboard}}
+				<tr>
+					{{#each this}}
+						<td style="width: {{unbound length}}px;">
+							{{note}}
+						</td>
+					{{/each}}
+				</tr>
+			{{/each}}
+		</table>
+	</script>
+
+<div id="controls">
+</div>
+<div id="infoPanel">
+</div>
+</body>
+
+</html>

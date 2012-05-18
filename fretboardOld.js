@@ -1,0 +1,433 @@
+Array.prototype.indexOf = function(target){
+	for(i=this.length; i>-1; i--){
+		if(this[i] == target){
+			return i;
+		}
+	}
+	return -1;
+}
+
+function $(id){
+	return document.getElementById(id);
+}
+
+function guitarFretboard(boardId, length, controlsId, infoPanelId){
+	var container = $(boardId);
+	var controls = $(controlsId);
+	var info = $(infoPanelId);
+	var boardLength = length;
+
+	var k = 1.0594631; // constant for guitar math
+	var fretLengths = [20];
+	
+	var notes = ["E", "F", "F#/Gb", "G", "G#/Ab", "A", "A#/Bb", "B", "C", "C#/Db", "D", "D#/Eb"];
+	//indexOf too inefficient
+	var noteIndices = {"E": 0, "F": 1, "F#/Gb": 2, "G": 3, "G#/Ab": 4, "A": 5, "A#/Bb": 6, "B": 7, "C": 8, "C#/Db": 9, "D": 10, "D#/Eb": 11}; 
+	var stringRoots = [0, 5, 10, 3, 7, 0];
+	var numFrets = 22;
+	
+	var root = "E";
+	
+	var table;
+	setupTable();
+	
+	var highlightColor = "#bbb";
+	
+	var selectionModes = new Array();
+	selectionModes['Single'] = [0];
+	selectionModes['Major Triad'] = [0, 4, 7]; //major third, perfect fifth
+	selectionModes['Minor Triad'] = [0, 3, 7]; //minor third, perfect fifth
+	selectionModes['Augmented Triad'] = [0, 4, 8]; //major third, augmented fifth
+	selectionModes['Diminished Triad'] = [0, 3, 6]; //minor third, diminished fifth
+	selectionModes['Major/Major Seventh'] = [0, 4, 7, 11]; //major third, perfect fifth, major seventh
+	selectionModes['Dominant Seventh'] = [0, 4, 7, 10]; //major third, perfect fifth, minor seventh
+	selectionModes['Minor/Minor Seventh'] = [0, 3, 7, 10]; //minor third, perfect fifth, minor seventh 
+	selectionModes['Major Scale'] = [0, 2, 4, 5, 7, 9, 11]; // T T S T T T S
+	selectionModes['Natural Minor Scale'] = [0, 2, 3, 5, 7, 8, 10]; // T S T T S T T
+	selectionModes['Harmonic Minor Scale'] = [0, 2, 3, 5, 7, 8, 11]; // T S T T S ST S
+	selectionModes['Melodic Minor Scale'] = [0, 2, 3, 5, 7, 9, 11]; // T S T T T T S
+	selectionModes['Major Pentatonic Scale'] = [0, 2, 4, 7, 9]; // T T TS T TS
+	selectionModes['Minor Pentatonic Scale'] = [0, 3, 5, 7, 10]; // TS T T TS T
+	selectionModes['Blues Scale'] = [0, 3, 5, 6, 7, 10]; //Minor pentatonic + blue note
+
+	var selectionMode = 'Single';
+	
+	setupControls();
+	
+	//highlightFret(1, 1);
+	
+	function stringRootNames(){
+		var names = new Array();
+		for(var i=0; i<stringRoots.length; i++){
+			names.push(notes[stringRoots[i]]);
+		}
+		return names;
+	}
+	
+	function retune(e){
+		setStringRoots(e.target.value);
+		setupTable();
+	}
+	
+	function refret(e){
+		numFrets = e.target.value;
+		setupTable();
+	}
+	
+	function setStringRoots(namesCSV){
+		var noteNames = namesCSV.split(",");
+		var roots = new Array();
+		for(var i=0; i<noteNames.length; i++){
+			roots.push(notes.indexOf(noteNames[i]));
+		}
+		stringRoots = roots;
+	}
+	
+	function setSelectionMode(e){
+		selectionMode = e.target.value;
+		selectNotes(e);
+	}
+	
+	function selectionControls(){
+		var selectionOptionsContainer = document.createElement("DIV");
+		var options = document.createElement("FORM");
+		for(var mode in selectionModes){
+			if(Array.prototype.hasOwnProperty(mode)) continue;
+			var option = document.createElement("INPUT");
+			option.type = "radio";
+			option.name = "selectionMode";
+			option.value = mode;
+			option.onclick = setSelectionMode;
+			
+			if(option.value == "Single"){
+				option.checked = true;
+			}
+			selectionOptionsContainer.appendChild(option);
+			selectionOptionsContainer.appendChild(document.createTextNode(mode));
+			selectionOptionsContainer.appendChild(document.createElement("BR"));
+		}
+		return selectionOptionsContainer;
+	}
+	
+	function configurationControls(){
+		var container = document.createElement("DIV");
+		container.appendChild(document.createTextNode("Tuning:"));
+		container.appendChild(document.createElement("BR"));
+		var tuningInput = document.createElement("INPUT");
+		tuningInput.type = "text";
+		tuningInput.value = stringRootNames();
+		tuningInput.onchange = retune;
+		container.appendChild(tuningInput);
+		container.appendChild(document.createElement("BR"));
+		container.appendChild(document.createElement("BR")); // Pure DOM construction is retarded.
+		container.appendChild(document.createTextNode("Number of Frets:"));
+		container.appendChild(document.createElement("BR"));
+		var fretInput = document.createElement("INPUT");
+		fretInput.type = "text";
+		fretInput.value = numFrets;
+		fretInput.onchange = refret;
+		container.appendChild(fretInput);
+
+		return container;
+	}
+	
+	function setupControls(){
+		controls.innerHTML = "";
+		controls.appendChild(configurationControls());
+		controls.appendChild(selectionControls());		
+	}
+	
+	function getFret(string, fret){
+		return table.rows[string].cells[fret];
+	}
+	
+	function highlightFret(string, fret){
+		getFret(string, fret).style.backgroundColor=highlightColor;
+	}
+	
+	function fretDistFromBridge(fretNumber){
+		return boardLength/Math.pow(k, fretNumber);
+	}
+	
+	function fretLength(fretNumber){
+		if(!fretLengths[fretNumber]){
+			fretLengths[fretNumber] = fretDistFromBridge(fretNumber) - fretDistFromBridge(fretNumber+1); 
+		}
+		return fretLengths[fretNumber];
+	}
+
+	function clearHighlight(){
+		var frets = table.getElementsByTagName("td");
+		for(var i=frets.length-1; i>-1; i--){
+			frets[i].style.backgroundColor = "#fff";
+			frets[i].selected = false;
+		}
+	}
+	
+	function sharpenNote(note, times){
+		var i = notes.indexOf(note);
+		return notes[(i+times) % notes.length];
+	}
+	
+	function highlightNotes(notes, colors){
+		var frets = table.getElementsByTagName("td");
+		for(var i=frets.length-1; i>-1; i--){
+			var fret = frets[i];
+			//var noteIndex = arrayContainsAtIndex(notes, fret.note);
+			var noteIndex = notes.indexOf(fret.note);
+			if(noteIndex != -1){
+				var color = colors[noteIndex];
+				fret.style.backgroundColor = color;
+				fret.selected = true;
+			}
+		}
+	}
+	
+	function noteDifference(n1, n2){
+		var i1 = noteIndices[n1], i2 = noteIndices[n2];
+		//var i1 = notes.indexOf(n1), i2 = notes.indexOf(n2);
+		return (i1<=i2) ? i2-i1 : 12 - i1 + i2;
+	}
+	
+	function noteList(root, offsets){
+		var set = document.createElement("DIV");
+		set.class = noteList;
+		for(var i=0; i<offsets.length; i++){
+			var note = document.createElement("SPAN");
+			note.className = note;
+			note.innerHTML = sharpenNote(root, offsets[i]);
+			noteList.appendChild(note)
+		}
+		return set;
+	}
+	
+	function analyzeChord(noteNames){
+		var length = noteNames.length;
+		if(length < 3) return "Not a chord";
+		var root = noteNames[0];
+		var analysis = root;
+		var offsets = new Array();
+		for(i=1; i<length; i++){
+			offsets.push(noteDifference(root, noteNames[i]));
+			//analysis += noteDifference(root, noteNames[i]) + " ";
+		}
+		
+		var majorThird = (offsets[0] == 4), minorThird = (offsets[0] == 3);
+		var perfectFifth = (offsets[1] == 7), augmentedFifth = (offsets[1] == 8), diminishedFifth = (offsets[1] == 6);
+		var majorTriad = (majorThird && perfectFifth), minorTriad = (minorThird && perfectFifth), augmentedTriad = (majorThird && augmentedFifth), diminishedTriad = (minorThird && diminishedFifth);
+		
+		if(minorTriad){
+			analysis += "m";
+		}
+		if(augmentedTriad){
+			analysis += "+";
+		}
+		if(diminishedTriad){
+			analysis += "dim";
+		}
+		if(length == 3){
+			return analysis;
+		}
+		
+		var major7th = (offsets[2] == 11), minor7th = (offsets[2] == 10), diminished7th = (offsets[2] == 9);
+		if(major7th){
+			analysis += " maj7";
+		}
+		if(minor7th){
+			analysis += " 7";
+		}
+		if(diminished7th){
+			analysis += " dim7";
+		}
+		
+		if(length == 4){
+			return analysis;
+		}
+
+		return "some kind of " + analysis;
+	}
+	
+	function diatonicChordNames(root, scale, order){	
+		var offsets = selectionModes[scale];
+		var length = offsets.length;
+		var names = new Array();
+		for(var i=0; i<length; i++){
+			var chordNotes = new Array();
+			for(var j=0; j<order; j++){
+				var note = sharpenNote(root, offsets[(i + j*2)%length]);
+				chordNotes.push(note);
+			}
+			names.push(analyzeChord(chordNotes));
+		}
+		return names;
+	}
+	
+	function diatonicChords(root, scale, order){
+		//i.e. for major triads: diatonicChords("C", "Major Scale", 3)
+		//     for major seventh chords: diatonicChords("C", "Major Scale", 4)
+		var orders = ["", "", "Triads", "7th Chords", "9th Chords", "11th Chords", "13th Chords"];
+		var offsets = selectionModes[scale];
+		
+		var report = document.createElement("DIV");
+		report.className = "infoChunk";
+		report.innerHTML += "<h2>Diatonic " + orders[order-1] + "</h2>";
+		
+		var chordAnalysis = document.createElement("DIV");
+		chordAnalysis.className = "chordList";
+		
+		var noteLists = document.createElement("DIV");
+		noteLists.className = "noteList";
+		
+		var length = offsets.length;
+		for(var i=0; i<length; i++){
+			var chordNotes = new Array();
+			for(var j=0; j<order; j++){
+				var note = sharpenNote(root, offsets[(i + j*2)%length]);
+				chordNotes.push(note);
+				var noteNode = document.createElement("SPAN");
+				noteNode.className = "note";
+				noteNode.innerHTML = note;
+				noteLists.appendChild(noteNode);
+			}
+			var hoverAnchor = document.createElement("SPAN");
+			hoverAnchor.className = "chord";
+			hoverAnchor.innerHTML = analyzeChord(chordNotes);
+			hoverAnchor.notes = chordNotes;
+			hoverAnchor.onmouseover = function(e){selectNoteSet(e.target.notes);};
+			hoverAnchor.onmouseout = function(e){selectNotes();};
+			chordAnalysis.appendChild(hoverAnchor);
+			chordAnalysis.appendChild(document.createElement("BR"));
+
+			noteLists.appendChild(document.createElement("BR"));
+		}
+		report.appendChild(chordAnalysis);
+		report.appendChild(noteLists);
+		
+		return report;
+	}
+	
+	function chordParentScaleType(chordNotes){
+		var chordName = analyzeChord(chordNotes);
+		var length = chordNotes.length;
+		var root = chordNotes[0];
+		var rootRegexp = new RegExp("^" + root + "$", "");
+		if(length == 3){
+			if(chordName.match(rootRegexp)){ //Major chord - Do this check explicitly because it's so likely
+				return "Major Scale";
+			}
+			else if(chordName.match(/dim/)){ //Diminished triad
+				scaleList.appendChild(document.createTextNode(chordName + " - Diminished"));
+			}
+			else if(chordName.match(/m/)){ //Minor triad
+				return "Minor Scale";
+			}
+
+			else if(chordName.match(/\+/)){ //Augmented triad
+				scaleList.appendChild(document.createTextNode(chordName + " - Augmented"));
+			}
+			else{
+				scaleList.appendChild(document.createTextNode(chordName + "???"));
+			}
+			//scaleList.appendChild(chordName);
+		}
+	}
+	
+	function diatonicScales(chordNotes){
+		var scaleList = document.createElement("DIV");
+		scaleList.innerHTML = "<h2>Diatonic Scales</h2>";
+		var chordName = analyzeChord(chordNotes);
+		
+		var diatonicChords = diatonicChordNames(root, "Major Scale", 3);
+		for(var i=0; i<diatonicChords.length; i++){
+			scaleList.appendChild(document.createTextNode(diatonicChords[i]));
+			scaleList.appendChild(document.createElement("BR"));
+		}
+	//	var diatonicNames = diatonicChordNames(chordNotes[0], 
+		return scaleList;
+	}
+	
+	function diatonicMajorTriads(root){
+		return diatonics(root, "Major Scale", 3);
+	}
+	
+	function printInfo(targets){
+		info.innerHTML = "<h2>" + targets[0] + " " + selectionMode + "</h2>";
+		if(selectionMode.match(/scale/i)){
+			//info.innerHTML += diatonicChords(targets[0], selectionMode, 3) + diatonicChords(targets[0], selectionMode, 4);
+			info.appendChild(diatonicChords(targets[0], selectionMode, 3));
+			info.appendChild(diatonicChords(targets[0], selectionMode, 4));
+		}
+		else{
+			info.appendChild(diatonicScales(targets));
+		}
+	}
+	
+	function selectNoteSet(set){
+		var offsets = new Array();
+		for(var i=0; i<set.length; i++){
+			offsets.push(noteDifference(root, set[i]));
+		}
+		selectNotes(offsets);
+	}
+	
+	function selectNotes(notes){
+		//alert(e.target.note);
+		var usingCustomNotes = (notes instanceof Array);
+		clearHighlight();
+		var targetOffsets = (usingCustomNotes)? notes : selectionModes[selectionMode];
+		var colors = new Array();
+		var targets = new Array();
+		var colorInterval = 1.0/targetOffsets.length;
+		for(var i=0; i<targetOffsets.length; i++){
+			var color = Math.floor(119 + colorInterval * i * 100);
+			var note = sharpenNote(root, targetOffsets[i]);
+			targets.push(note);
+			colors.push("rgb(" + color + ", " + color + ", " + color + ")");
+		}
+		//alert(colors);
+		highlightNotes(targets, colors);
+		if(!usingCustomNotes){
+			printInfo(targets);
+		}
+	}
+	
+	function setRoot(e){
+		root = e.target.note;
+		selectNotes();
+	}
+	
+	function setupTable(){
+		container.innerHTML = "";
+		table = createTable();
+		container.appendChild(table);
+	}
+	
+	function createTable(){
+		var table = document.createElement("TABLE");
+		var tableHeader = "<tr>";
+		for(var i=0; i<=numFrets; i++){
+			tableHeader += "<th>" + i + "</th>";
+		}
+		tableHeader += "</tr>";
+		table.innerHTML += tableHeader;
+		for(var string=stringRoots.length; string>=1; string--){
+			var row = document.createElement("TR");
+			row.id="string" + string;
+			for(var fret=0; fret<=numFrets; fret++){
+				var fretData = document.createElement("TD");
+				var rootNote = stringRoots[string-1];
+				fretData.style.width = fretLength(fret);
+				fretData.innerHTML = fretData.note = notes[(rootNote + fret)%12];
+				fretData.onclick = setRoot;
+				fretData.selected = false;
+				row.appendChild(fretData);
+			}
+			table.appendChild(row);
+		}
+		return table;
+	}
+}
+
+function setupFretboard(){
+	var fretboard = new guitarFretboard("fretboard", 1800, "controls", "infoPanel");
+}
